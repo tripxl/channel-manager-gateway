@@ -1,0 +1,170 @@
+import { ConfigService } from "@nestjs/config";
+import { DjuboOperationMapper } from "../src/providers/djubo/mapper/djubo-operation.mapper";
+
+describe("DjuboOperationMapper", () => {
+  const mapper = new DjuboOperationMapper(new ConfigService({ DJUBO_API_VERSION: "9", DJUBO_SOURCE_ID: "100", DJUBO_SUB_SOURCE_ID: "1001" }));
+  const context = { provider: "DJUBO", providerHotelId: "4", environment: "PRODUCTION", requestId: "req-1" } as const;
+
+  it("maps guest creation using the documented mixed field names", () => {
+    expect(mapper.createGuest(context, { firstName: "Yash", email: "yash@example.com" })).toMatchObject({
+      api_version: 9, source_id: 100, sub_source_id: 1001, partner_hotel_code: "4", guestTrackerId: -1, firstName: "Yash",
+    });
+  });
+
+  it("maps booking information as documented query parameters", () => {
+    expect(mapper.bookingInformation(context, { referenceId: "ref", reservationId: "res", guestTrackerId: "guest" })).toEqual({
+      partner_hotel_code: "4", reference_id: "ref", reservation_id: "res", guest_tracker_id: "guest",
+      api_version: 9, source_id: 100, sub_source_id: 1001,
+    });
+  });
+
+  it("maps provider responses recursively to camelCase", () => {
+    expect(mapper.response({ voucher_cancelled: true, cancellation_data: { applicable_slab: { day_from_check_in: 1 } } })).toEqual({
+      voucherCancelled: true, cancellationData: { applicableSlab: { dayFromCheckIn: 1 } },
+    });
+  });
+
+  it("rejects missing mandatory operation fields", () => {
+    expect(() => mapper.fetchReservation(context, { searchKey: "Folio Reservation Number" })).toThrow("Missing required fields: searchValue");
+  });
+
+  it("requires booking payment details", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-1", customer: {}, rooms: [],
+      addOns: [], finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 }, partnerData: {},
+    })).toThrow("Missing required fields: payments");
+  });
+
+  it("requires payments but omits payment method for a pay-at-checkout booking", () => {
+    const result = mapper.bookingSubmit(context, {
+      startDate: "2026-12-10",
+      endDate: "2026-12-12",
+      referenceId: "AIRIQ-PAY-LATER-1",
+      customer: {},
+      rooms: [{ party: [{ adults: 2, children: [] }] }],
+      payments: {
+        pgTransactionId: "pay-later-1",
+        pgReferenceId: "order-later-1",
+        amount: 10490,
+        payeeInfo: {},
+      },
+      finalPriceAtBooking: { amount: 0, currency: "INR" },
+      finalPriceAtCheckout: { amount: 10490, currency: "INR" },
+      partnerData: { "101": "opaque-token" },
+    });
+
+    expect(result).not.toHaveProperty("payment_method");
+    expect(result).toMatchObject({
+      payments: {
+        pg_transaction_id: "pay-later-1",
+        pg_reference_id: "order-later-1",
+        amount: 10490,
+      },
+      final_price_at_booking: { amount: 0, currency: "INR" },
+      final_price_at_checkout: { amount: 10490, currency: "INR" },
+    });
+  });
+
+  it("maps booking submit without requiring optional DJUBO fields", () => {
+    const result = mapper.bookingSubmit(context, {
+      startDate: "2026-12-10",
+      endDate: "2026-12-12",
+      referenceId: "AIRIQ-1",
+      customer: {
+        firstName: "Deepak",
+        lastName: "Pal",
+        phoneNumber: "9876543210",
+        email: "deepak@example.com",
+        country: "IN",
+      },
+      rooms: [{
+        party: [{ adults: 2, childrenAges: [] }],
+        travelerFirstName: "Deepak",
+        travelerLastName: "Pal",
+      }],
+      paymentMethod: {
+        cardType: "Visa",
+        cardNumber: "4111111111111111",
+        cardholderName: "Deepak Pal",
+        expirationMonth: "12",
+        expirationYear: "2028",
+        cvv: "123",
+        billingAddress: {},
+      },
+      payments: {
+        pgTransactionId: "pay-1",
+        pgReferenceId: "order-1",
+        amount: 10710,
+        paymentType: 3,
+        cardType: 1,
+        payeeInfo: {},
+      },
+      finalPriceAtBooking: { amount: 10710, currency: "INR" },
+      finalPriceAtCheckout: { amount: 0, currency: "INR" },
+      partnerData: { "101": "opaque-token" },
+      cartId: "must-not-reach-djubo",
+      paymentId: "must-not-reach-djubo",
+    });
+
+    expect(result).toMatchObject({
+      api_version: 9,
+      partner_hotel_code: "4",
+      start_date: "2026-12-10",
+      end_date: "2026-12-12",
+      reference_id: "AIRIQ-1",
+      multiple_category_allowed: true,
+      payments: {
+        pg_transaction_id: "pay-1",
+        pg_reference_id: "order-1",
+        payment_type: 3,
+        card_type: 1,
+      },
+      partner_data: { "101": "opaque-token" },
+    });
+    expect(result).not.toHaveProperty("cartId");
+    expect(result).not.toHaveProperty("paymentId");
+    expect(result).not.toHaveProperty("ip_address");
+    expect(result).not.toHaveProperty("customer_list");
+    expect(result).not.toHaveProperty("addOns");
+    expect(result).not.toHaveProperty("promo_details");
+    expect(result).not.toHaveProperty("special_requests");
+    expect(result).not.toHaveProperty("partner_room_data");
+  });
+
+  it("rejects partner tokens that do not cover every booking party room", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-2",
+      customer: {}, rooms: [{ party: [{ adults: 2 }, { adults: 2 }] }],
+      payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 100, payeeInfo: {} },
+      finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 },
+      partnerData: { "101": "one-token" },
+    })).toThrow("partnerData token count (1) must match booking party count (2)");
+  });
+
+  it("rejects a paid booking whose payment and booking amounts differ", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-3",
+      customer: {}, rooms: [{ party: [{ adults: 2 }] }],
+      payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 99, payeeInfo: {} },
+      finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 },
+      partnerData: { "101": "one-token" },
+    })).toThrow("payments.amount must equal finalPriceAtBooking.amount");
+  });
+
+  it("builds DJUBO partner_data from provider-neutral room selections", () => {
+    const result = mapper.bookingSubmit(context, {
+      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-4",
+      customer: {}, rooms: [{ party: [{ adults: 2 }, { adults: 3 }] }],
+      payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 200, payeeInfo: {} },
+      finalPriceAtBooking: { amount: 200 }, finalPriceAtCheckout: { amount: 0 },
+      roomSelections: [
+        { roomId: "101", price: { totalAmount: "100" }, providerData: { payload: { bookingToken: "shared-rate-token" } } },
+        { roomId: "102", price: { totalAmount: "100" }, providerData: { payload: { bookingToken: "shared-rate-token" } } },
+      ],
+    });
+    expect(result.partner_data).toEqual({
+      "101": "shared-rate-token",
+      "102": "shared-rate-token",
+    });
+  });
+});
