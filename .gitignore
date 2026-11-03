@@ -1,14 +1,9 @@
 node_modules/
 dist/
-coverage/
 .env
 *.log
 
 node_modules/
 dist/
-coverage/
 .env
-*.log
-
-coverage/
 *.log
