@@ -1,6 +1,6 @@
 # AirIQ Channel Manager Gateway
 
-Stateless NestJS service exposing the private `/internal/v1` API described in the AirIQ implementation brief. It has no database or ORM dependency. The AirIQ hotel backend remains responsible for mappings, offers, idempotency, booking state, payment, and reconciliation.
+Stateless NestJS service exposing the private `/api-gateway/v1` API described in the AirIQ implementation brief. It has no database or ORM dependency. The AirIQ hotel backend remains responsible for mappings, offers, idempotency, booking state, payment, and reconciliation.
 
 ## Implemented
 
@@ -32,19 +32,19 @@ All routes use the same `{ context, data }` envelope as availability.
 
 | Gateway route | DJUBO operation |
 |---|---|
-| `POST /internal/v1/guests` | Guest creation |
-| `POST /internal/v1/guests/update` | Guest update |
-| `POST /internal/v1/guests/history` | Guest history search |
-| `POST /internal/v1/availability` | Booking availability |
-| `POST /internal/v1/bookings/submit` | Booking submit |
-| `POST /internal/v1/bookings/information` | Booking information |
-| `POST /internal/v1/reservations/fetch` | Fetch reservation |
-| `POST /internal/v1/rooms/availability` | Fetch room numbers |
-| `POST /internal/v1/rooms/status` | Fetch room status |
-| `POST /internal/v1/bookings/check-in` | Check-in |
-| `POST /internal/v1/bookings/check-out` | Check-out |
-| `POST /internal/v1/bookings/cancellation` | Cancellation/rules |
-| `POST /internal/v1/bookings/update` | Booking room/category update |
+| `POST /internal/guests` | Guest creation |
+| `POST /internal/guests/update` | Guest update |
+| `POST /internal/guests/history` | Guest history search |
+| `POST /internal/availability` | Booking availability |
+| `POST /internal/bookings/submit` | Booking submit |
+| `POST /internal/bookings/information` | Booking information |
+| `POST /internal/reservations/fetch` | Fetch reservation |
+| `POST /internal/rooms/availability` | Fetch room numbers |
+| `POST /internal/rooms/status` | Fetch room status |
+| `POST /internal/bookings/check-in` | Check-in |
+| `POST /internal/bookings/check-out` | Check-out |
+| `POST /internal/bookings/cancellation` | Cancellation/rules |
+| `POST /internal/bookings/update` | Booking room/category update |
 
 ## Run
 
