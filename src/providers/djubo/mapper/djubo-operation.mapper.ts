@@ -50,20 +50,25 @@ export class DjuboOperationMapper {
       "referenceId",
       "customer",
       "rooms",
-      "payments",
       "finalPriceAtBooking",
       "finalPriceAtCheckout",
     ]);
     this.validateStay(data.startDate, data.endDate);
     this.validateBookingRooms(data.rooms);
-    this.requireObjectFields(
+    const payAtCheckoutOnly = this.validatePaymentMode(
       data.payments,
-      ["pgTransactionId", "pgReferenceId", "amount", "payeeInfo"],
-      "payments",
+      data.paymentMethod,
+      data.finalPriceAtBooking,
+      data.finalPriceAtCheckout,
     );
+    if (!payAtCheckoutOnly)
+      this.requireObjectFields(
+        data.payments,
+        ["pgTransactionId", "pgReferenceId", "amount", "payeeInfo"],
+        "payments",
+      );
     const partnerData = this.resolvePartnerData(data);
     this.validateBookingRoomTokens(data.rooms, partnerData);
-    this.validatePaidBookingAmount(data.payments, data.finalPriceAtBooking);
     this.validateRoomSelectionTotal(
       data.roomSelections,
       data.finalPriceAtBooking,
@@ -77,11 +82,17 @@ export class DjuboOperationMapper {
       multiple_category_allowed: true,
       customer: this.snakeCaseDeep(data.customer),
       rooms: this.snakeCaseDeep(data.rooms),
-      payments: this.snakeCaseDeep(data.payments),
       final_price_at_booking: this.snakeCaseDeep(data.finalPriceAtBooking),
       final_price_at_checkout: this.snakeCaseDeep(data.finalPriceAtCheckout),
       partner_data: partnerData,
     };
+
+    if (!payAtCheckoutOnly)
+      this.assignWhenDefined(
+        payload,
+        "payments",
+        this.snakeCaseDeep(data.payments),
+      );
 
     this.assignWhenDefined(payload, "ip_address", data.ipAddress);
     this.assignWhenDefined(
@@ -96,16 +107,13 @@ export class DjuboOperationMapper {
       this.snakeCaseDeep(data.promoDetails),
     );
     this.assignWhenDefined(payload, "special_requests", data.specialRequests);
-    this.assignWhenDefined(
-      payload,
-      "payment_method",
-      this.snakeCaseDeep(data.paymentMethod),
-    );
-    this.assignWhenDefined(
-      payload,
-      "partner_room_data",
-      data.partnerRoomData,
-    );
+    if (!payAtCheckoutOnly)
+      this.assignWhenDefined(
+        payload,
+        "payment_method",
+        this.snakeCaseDeep(data.paymentMethod),
+      );
+    this.assignWhenDefined(payload, "partner_room_data", data.partnerRoomData);
 
     return payload;
   }
@@ -223,12 +231,15 @@ export class DjuboOperationMapper {
       partner_hotel_code: context.providerHotelId,
     };
   }
+
   private get apiVersion() {
     return Number(this.config.get("DJUBO_API_VERSION", "9"));
   }
+  
   private get sourceId() {
     return Number(this.config.get("DJUBO_SOURCE_ID", 105));
   }
+  
   private get subSourceId() {
     return Number(this.config.get("DJUBO_SUB_SOURCE_ID", 110));
   }
@@ -308,8 +319,82 @@ export class DjuboOperationMapper {
     return Number((value as Record<string, unknown>).amount);
   }
 
+  private validatePaymentMode(
+    payments: unknown,
+    paymentMethod: unknown,
+    finalPriceAtBooking: unknown,
+    finalPriceAtCheckout: unknown,
+  ): boolean {
+    this.requireMoney(finalPriceAtBooking, "finalPriceAtBooking");
+    this.requireMoney(finalPriceAtCheckout, "finalPriceAtCheckout");
+    const bookingAmount = this.amount(finalPriceAtBooking);
+    const checkoutAmount = this.amount(finalPriceAtCheckout);
+    const bookingCurrency = this.currency(finalPriceAtBooking);
+    const checkoutCurrency = this.currency(finalPriceAtCheckout);
+    if (
+      !Number.isFinite(bookingAmount) ||
+      !Number.isFinite(checkoutAmount) ||
+      bookingAmount < 0 ||
+      checkoutAmount < 0 ||
+      bookingAmount + checkoutAmount <= 0
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "Booking and checkout prices must be non-negative and have a positive total",
+        HttpStatus.BAD_REQUEST,
+      );
+    if (bookingCurrency !== checkoutCurrency)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "finalPriceAtBooking.currency must match finalPriceAtCheckout.currency",
+        HttpStatus.BAD_REQUEST,
+      );
+
+    const hasPayments = payments !== undefined && payments !== null;
+    if (!hasPayments) {
+      if (paymentMethod !== undefined && paymentMethod !== null)
+        throw new GatewayException(
+          "VALIDATION_FAILED",
+          "paymentMethod cannot be supplied without payments",
+          HttpStatus.BAD_REQUEST,
+        );
+      if (bookingAmount !== 0 || checkoutAmount <= 0)
+        throw new GatewayException(
+          "VALIDATION_FAILED",
+          "Without payments, finalPriceAtBooking.amount must be 0 and finalPriceAtCheckout.amount must be greater than 0",
+          HttpStatus.BAD_REQUEST,
+        );
+      return true;
+    }
+
+    if (bookingAmount <= 0)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "When payments is supplied, finalPriceAtBooking.amount must be greater than 0",
+        HttpStatus.BAD_REQUEST,
+      );
+    const paymentAmount = this.amount(payments);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "payments.amount must be greater than 0",
+        HttpStatus.BAD_REQUEST,
+      );
+    if (paymentAmount !== bookingAmount)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "payments.amount must equal finalPriceAtBooking.amount",
+        HttpStatus.BAD_REQUEST,
+      );
+    return false;
+  }
+
   private validateBookingRoomTokens(rooms: unknown, partnerData: unknown) {
-    if (!partnerData || typeof partnerData !== "object" || Array.isArray(partnerData))
+    if (
+      !partnerData ||
+      typeof partnerData !== "object" ||
+      Array.isArray(partnerData)
+    )
       throw new GatewayException(
         "VALIDATION_FAILED",
         "partnerData must be an object keyed by availability room_id",
@@ -317,13 +402,20 @@ export class DjuboOperationMapper {
       );
     const tokens = partnerData as Record<string, unknown>;
     const tokenRoomIds = Object.keys(tokens);
-    if (!tokenRoomIds.length || tokenRoomIds.some((roomId) => !/^\d+$/.test(roomId)))
+    if (
+      !tokenRoomIds.length ||
+      tokenRoomIds.some((roomId) => !/^\d+$/.test(roomId))
+    )
       throw new GatewayException(
         "VALIDATION_FAILED",
         "partnerData must contain numeric availability room_id keys",
         HttpStatus.BAD_REQUEST,
       );
-    if (Object.values(tokens).some((token) => typeof token !== "string" || !token.trim()))
+    if (
+      Object.values(tokens).some(
+        (token) => typeof token !== "string" || !token.trim(),
+      )
+    )
       throw new GatewayException(
         "VALIDATION_FAILED",
         "Each partnerData room_id must contain a non-empty DJUBO partner_data token",
@@ -331,9 +423,10 @@ export class DjuboOperationMapper {
       );
     const partyCount = Array.isArray(rooms)
       ? rooms.reduce((count, room) => {
-          const value = room && typeof room === "object"
-            ? room as Record<string, unknown>
-            : {};
+          const value =
+            room && typeof room === "object"
+              ? (room as Record<string, unknown>)
+              : {};
           return count + (Array.isArray(value.party) ? value.party.length : 0);
         }, 0)
       : 0;
@@ -369,19 +462,26 @@ export class DjuboOperationMapper {
         HttpStatus.BAD_REQUEST,
       );
     const parties = rooms.flatMap((rawRoom) => {
-      const room = rawRoom && typeof rawRoom === "object"
-        ? rawRoom as Record<string, unknown>
-        : {};
+      const room =
+        rawRoom && typeof rawRoom === "object"
+          ? (rawRoom as Record<string, unknown>)
+          : {};
       return Array.isArray(room.party) ? room.party : [];
     });
-    if (!parties.length || parties.some((rawParty) => {
-      const party = rawParty && typeof rawParty === "object"
-        ? rawParty as Record<string, unknown>
-        : {};
-      const adults = Number(party.adults);
-      const children = party.children ?? party.childrenAges ?? [];
-      return !Number.isInteger(adults) || adults < 1 || !Array.isArray(children);
-    }))
+    if (
+      !parties.length ||
+      parties.some((rawParty) => {
+        const party =
+          rawParty && typeof rawParty === "object"
+            ? (rawParty as Record<string, unknown>)
+            : {};
+        const adults = Number(party.adults);
+        const children = party.children ?? party.childrenAges ?? [];
+        return (
+          !Number.isInteger(adults) || adults < 1 || !Array.isArray(children)
+        );
+      })
+    )
       throw new GatewayException(
         "VALIDATION_FAILED",
         "Every booking room requires party entries with at least one adult and a children array",
@@ -389,9 +489,15 @@ export class DjuboOperationMapper {
       );
   }
 
-  private resolvePartnerData(data: ProviderOperationData): Record<string, unknown> {
+  private resolvePartnerData(
+    data: ProviderOperationData,
+  ): Record<string, unknown> {
     if (data.partnerData !== undefined) {
-      if (!data.partnerData || typeof data.partnerData !== "object" || Array.isArray(data.partnerData))
+      if (
+        !data.partnerData ||
+        typeof data.partnerData !== "object" ||
+        Array.isArray(data.partnerData)
+      )
         throw new GatewayException(
           "VALIDATION_FAILED",
           "partnerData must be an object keyed by availability roomId",
@@ -406,15 +512,18 @@ export class DjuboOperationMapper {
         HttpStatus.BAD_REQUEST,
       );
     const entries = data.roomSelections.map((rawSelection) => {
-      const selection = rawSelection && typeof rawSelection === "object"
-        ? rawSelection as Record<string, unknown>
-        : {};
-      const providerData = selection.providerData && typeof selection.providerData === "object"
-        ? selection.providerData as Record<string, unknown>
-        : {};
-      const payload = providerData.payload && typeof providerData.payload === "object"
-        ? providerData.payload as Record<string, unknown>
-        : {};
+      const selection =
+        rawSelection && typeof rawSelection === "object"
+          ? (rawSelection as Record<string, unknown>)
+          : {};
+      const providerData =
+        selection.providerData && typeof selection.providerData === "object"
+          ? (selection.providerData as Record<string, unknown>)
+          : {};
+      const payload =
+        providerData.payload && typeof providerData.payload === "object"
+          ? (providerData.payload as Record<string, unknown>)
+          : {};
       const roomId = String(selection.roomId ?? "");
       const bookingToken = payload.bookingToken;
       if (!roomId || bookingToken === undefined)
@@ -434,15 +543,20 @@ export class DjuboOperationMapper {
     return Object.fromEntries(entries);
   }
 
-  private validatePaidBookingAmount(payments: unknown, finalPriceAtBooking: unknown) {
-    const bookingAmount = this.amount(finalPriceAtBooking);
-    const paymentAmount = this.amount(payments);
-    if (bookingAmount > 0 && paymentAmount !== bookingAmount)
+  private requireMoney(value: unknown, fieldName: string) {
+    this.requireObjectFields(value, ["amount", "currency"], fieldName);
+    const currency = this.currency(value);
+    if (!/^[A-Z]{3}$/.test(currency))
       throw new GatewayException(
         "VALIDATION_FAILED",
-        "payments.amount must equal finalPriceAtBooking.amount",
+        `${fieldName}.currency must be a three-letter uppercase currency code`,
         HttpStatus.BAD_REQUEST,
       );
+  }
+
+  private currency(value: unknown): string {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+    return String((value as Record<string, unknown>).currency ?? "");
   }
 
   private validateRoomSelectionTotal(
@@ -453,12 +567,14 @@ export class DjuboOperationMapper {
     if (!Array.isArray(roomSelections)) return;
     let selectedTotal = 0;
     for (const rawSelection of roomSelections) {
-      const selection = rawSelection && typeof rawSelection === "object"
-        ? rawSelection as Record<string, unknown>
-        : {};
-      const price = selection.price && typeof selection.price === "object"
-        ? selection.price as Record<string, unknown>
-        : {};
+      const selection =
+        rawSelection && typeof rawSelection === "object"
+          ? (rawSelection as Record<string, unknown>)
+          : {};
+      const price =
+        selection.price && typeof selection.price === "object"
+          ? (selection.price as Record<string, unknown>)
+          : {};
       const totalAmount = Number(price.totalAmount);
       if (!Number.isFinite(totalAmount) || totalAmount < 0)
         throw new GatewayException(
@@ -468,8 +584,12 @@ export class DjuboOperationMapper {
         );
       selectedTotal += totalAmount;
     }
-    const submittedTotal = this.amount(finalPriceAtBooking) + this.amount(finalPriceAtCheckout);
-    if (!Number.isFinite(submittedTotal) || Math.abs(selectedTotal - submittedTotal) > 0.001)
+    const submittedTotal =
+      this.amount(finalPriceAtBooking) + this.amount(finalPriceAtCheckout);
+    if (
+      !Number.isFinite(submittedTotal) ||
+      Math.abs(selectedTotal - submittedTotal) > 0.001
+    )
       throw new GatewayException(
         "VALIDATION_FAILED",
         "Selected room total must equal finalPriceAtBooking plus finalPriceAtCheckout",

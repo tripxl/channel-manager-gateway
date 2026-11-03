@@ -12,7 +12,7 @@ import { CancelEnvelopeDto } from "../dtos/requests/cancellation.dto";
 import { ChannelManagerService } from "../services/channel-manager.service";
 import { ProviderOperationEnvelopeDto } from "../dtos/requests/provider-operation.dto";
 
-@Controller("internal/v1")
+@Controller("internal")
 export class ChannelManagerController {
   constructor(private readonly channelManagerService: ChannelManagerService) {}
 

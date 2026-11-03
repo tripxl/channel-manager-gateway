@@ -30,13 +30,15 @@ describe("DjuboOperationMapper", () => {
 
   it("requires booking payment details", () => {
     expect(() => mapper.bookingSubmit(context, {
-      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-1", customer: {}, rooms: [],
-      addOns: [], finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 }, partnerData: {},
-    })).toThrow("Missing required fields: payments");
+      startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-1", customer: {},
+      rooms: [{ party: [{ adults: 2, children: [] }] }],
+      addOns: [], finalPriceAtBooking: { amount: 100, currency: "INR" },
+      finalPriceAtCheckout: { amount: 0, currency: "INR" }, partnerData: {},
+    })).toThrow("Without payments, finalPriceAtBooking.amount must be 0");
   });
 
-  it("requires payments but omits payment method for a pay-at-checkout booking", () => {
-    const result = mapper.bookingSubmit(context, {
+  it("rejects payments for a pay-at-checkout booking", () => {
+    expect(() => mapper.bookingSubmit(context, {
       startDate: "2026-12-10",
       endDate: "2026-12-12",
       referenceId: "AIRIQ-PAY-LATER-1",
@@ -48,21 +50,62 @@ describe("DjuboOperationMapper", () => {
         amount: 10490,
         payeeInfo: {},
       },
+      paymentMethod: { cardNumber: "must-not-reach-djubo" },
       finalPriceAtBooking: { amount: 0, currency: "INR" },
       finalPriceAtCheckout: { amount: 10490, currency: "INR" },
       partnerData: { "101": "opaque-token" },
-    });
+    })).toThrow("When payments is supplied, finalPriceAtBooking.amount must be greater than 0");
+  });
 
+  it("allows pay-at-checkout booking without payment objects", () => {
+    const result = mapper.bookingSubmit(context, {
+      startDate: "2026-12-21",
+      endDate: "2026-12-22",
+      referenceId: "AIRIQ-CHECKOUT-ONLY",
+      customer: {},
+      rooms: [{ party: [{ adults: 2, children: [] }] }],
+      finalPriceAtBooking: { amount: 0, currency: "INR" },
+      finalPriceAtCheckout: { amount: 10235, currency: "INR" },
+      partnerData: { "101": "checkout-rate-token" },
+    });
+    expect(result).not.toHaveProperty("payments");
     expect(result).not.toHaveProperty("payment_method");
     expect(result).toMatchObject({
-      payments: {
-        pg_transaction_id: "pay-later-1",
-        pg_reference_id: "order-later-1",
-        amount: 10490,
-      },
       final_price_at_booking: { amount: 0, currency: "INR" },
-      final_price_at_checkout: { amount: 10490, currency: "INR" },
+      final_price_at_checkout: { amount: 10235, currency: "INR" },
+      partner_data: { "101": "checkout-rate-token" },
     });
+  });
+
+  it("rejects zero checkout amount when payments is absent", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-21", endDate: "2026-12-22", referenceId: "AIRIQ-NO-PAYMENT",
+      customer: {}, rooms: [{ party: [{ adults: 2, children: [] }] }],
+      finalPriceAtBooking: { amount: 0, currency: "INR" },
+      finalPriceAtCheckout: { amount: 0, currency: "INR" },
+      partnerData: { "101": "token" },
+    })).toThrow("positive total");
+  });
+
+  it("rejects payment method when payments is absent", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-21", endDate: "2026-12-22", referenceId: "AIRIQ-METHOD-ONLY",
+      customer: {}, rooms: [{ party: [{ adults: 2, children: [] }] }],
+      paymentMethod: { cardNumber: "not-allowed" },
+      finalPriceAtBooking: { amount: 0, currency: "INR" },
+      finalPriceAtCheckout: { amount: 100, currency: "INR" },
+      partnerData: { "101": "token" },
+    })).toThrow("paymentMethod cannot be supplied without payments");
+  });
+
+  it("rejects different booking and checkout currencies", () => {
+    expect(() => mapper.bookingSubmit(context, {
+      startDate: "2026-12-21", endDate: "2026-12-22", referenceId: "AIRIQ-CURRENCY",
+      customer: {}, rooms: [{ party: [{ adults: 2, children: [] }] }],
+      finalPriceAtBooking: { amount: 0, currency: "INR" },
+      finalPriceAtCheckout: { amount: 100, currency: "USD" },
+      partnerData: { "101": "token" },
+    })).toThrow("finalPriceAtBooking.currency must match finalPriceAtCheckout.currency");
   });
 
   it("maps booking submit without requiring optional DJUBO fields", () => {
@@ -136,7 +179,7 @@ describe("DjuboOperationMapper", () => {
       startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-2",
       customer: {}, rooms: [{ party: [{ adults: 2 }, { adults: 2 }] }],
       payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 100, payeeInfo: {} },
-      finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 },
+      finalPriceAtBooking: { amount: 100, currency: "INR" }, finalPriceAtCheckout: { amount: 0, currency: "INR" },
       partnerData: { "101": "one-token" },
     })).toThrow("partnerData token count (1) must match booking party count (2)");
   });
@@ -146,7 +189,7 @@ describe("DjuboOperationMapper", () => {
       startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-3",
       customer: {}, rooms: [{ party: [{ adults: 2 }] }],
       payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 99, payeeInfo: {} },
-      finalPriceAtBooking: { amount: 100 }, finalPriceAtCheckout: { amount: 0 },
+      finalPriceAtBooking: { amount: 100, currency: "INR" }, finalPriceAtCheckout: { amount: 0, currency: "INR" },
       partnerData: { "101": "one-token" },
     })).toThrow("payments.amount must equal finalPriceAtBooking.amount");
   });
@@ -156,7 +199,7 @@ describe("DjuboOperationMapper", () => {
       startDate: "2026-12-10", endDate: "2026-12-12", referenceId: "AIRIQ-4",
       customer: {}, rooms: [{ party: [{ adults: 2 }, { adults: 3 }] }],
       payments: { pgTransactionId: "pay", pgReferenceId: "order", amount: 200, payeeInfo: {} },
-      finalPriceAtBooking: { amount: 200 }, finalPriceAtCheckout: { amount: 0 },
+      finalPriceAtBooking: { amount: 200, currency: "INR" }, finalPriceAtCheckout: { amount: 0, currency: "INR" },
       roomSelections: [
         { roomId: "101", price: { totalAmount: "100" }, providerData: { payload: { bookingToken: "shared-rate-token" } } },
         { roomId: "102", price: { totalAmount: "100" }, providerData: { payload: { bookingToken: "shared-rate-token" } } },

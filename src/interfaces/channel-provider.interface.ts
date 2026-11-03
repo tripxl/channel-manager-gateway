@@ -2,7 +2,10 @@ import {
   AvailabilityRequest,
   RecheckRateRequest,
 } from "../contracts/requests/availability.contract";
-import { RecheckRateResponse } from "../contracts/responses/availability.response";
+import {
+  RecheckRateResponse,
+  UnifiedAvailabilityResponse,
+} from "../contracts/responses/availability.response";
 import {
   CreateBookingRequest,
   ReservationLookupRequest,
@@ -31,7 +34,7 @@ export interface ChannelProvider {
   getAvailability(
     context: ProviderContext,
     request: AvailabilityRequest,
-  ): Promise<unknown>;
+  ): Promise<UnifiedAvailabilityResponse>;
   recheckRate?(
     context: ProviderContext,
     request: RecheckRateRequest,
@@ -56,16 +59,52 @@ export interface ChannelProvider {
     context: ProviderContext,
     request: CancellationQuoteRequest,
   ): Promise<CancellationQuoteResponse>;
-  createGuest?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  updateGuest?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  getGuestHistory?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  submitBooking?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  getBookingInformation?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  fetchReservation?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  fetchRoomNumbers?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  fetchRoomStatus?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  checkIn?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  checkOut?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  cancelReservation?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
-  updateBooking?(context: ProviderContext, request: ProviderOperationData): Promise<ProviderOperationResponse>;
+  createGuest?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  updateGuest?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  getGuestHistory?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  submitBooking?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  getBookingInformation?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  fetchReservation?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  fetchRoomNumbers?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  fetchRoomStatus?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  checkIn?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  checkOut?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  cancelReservation?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  updateBooking?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
 }

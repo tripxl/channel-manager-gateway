@@ -38,6 +38,7 @@ export class CreateBookingEnvelopeDto extends EnvelopeDto<CreateBookingDataDto> 
   @Type(() => CreateBookingDataDto)
   declare data: CreateBookingDataDto;
 }
+
 export class BookingIdentifiersEnvelopeDto extends EnvelopeDto<BookingIdentifiersDto> {
   @ValidateNested()
   @Type(() => ProviderContextDto)

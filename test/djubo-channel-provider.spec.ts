@@ -44,13 +44,13 @@ describe("DjuboChannelProvider availability tracing", () => {
     });
 
     expect(result).toEqual({
-      provider: "DJUBO",
-      providerHotelId: "318",
+      ...normalized,
       requestId: "req-availability-trace",
-      mappingVersion: 1,
-      normalized,
-      rawProviderResponse,
+      trace: {
+        mappingVersion: 1,
+        rawProviderResponse,
+      },
     });
-    expect(result.rawProviderResponse).toBe(rawProviderResponse);
+    expect(result.trace.rawProviderResponse).toBe(rawProviderResponse);
   });
 });

@@ -62,13 +62,14 @@ export interface AvailabilityResponse {
   providerDetails?: unknown;
 }
 
-export interface TracedAvailabilityResponse<TRaw = unknown> {
-  provider: ProviderCode;
-  providerHotelId: string;
+export interface UnifiedAvailabilityResponse<
+  TRaw = unknown,
+> extends AvailabilityResponse {
   requestId: string;
-  mappingVersion: number;
-  normalized: AvailabilityResponse;
-  rawProviderResponse: TRaw;
+  trace: {
+    mappingVersion: number;
+    rawProviderResponse: TRaw;
+  };
 }
 
 export interface ProviderData<T = unknown> {

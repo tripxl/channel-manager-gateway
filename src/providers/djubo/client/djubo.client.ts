@@ -28,7 +28,12 @@ export class DjuboClient {
     context: ProviderContext,
     request: DjuboAvailabilityRequest,
   ): Promise<DjuboAvailabilityResponse> {
-    return this.request<DjuboAvailabilityResponse>("availability", context, request, true);
+    return this.request<DjuboAvailabilityResponse>(
+      "availability",
+      context,
+      request,
+      true,
+    );
   }
 
   async request<T>(
@@ -51,7 +56,9 @@ export class DjuboClient {
             "content-type": "application/json",
             "x-request-id": context.requestId,
           },
-          ...(endpoint.method === "GET" ? { params: payload } : { data: payload }),
+          ...(endpoint.method === "GET"
+            ? { params: payload }
+            : { data: payload }),
         },
         {
           provider: "DJUBO",

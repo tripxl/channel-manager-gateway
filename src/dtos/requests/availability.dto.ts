@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsObject,
+  IsOptional,
   Matches,
   ValidateNested,
 } from "class-validator";
@@ -24,8 +25,9 @@ export class AvailabilityDataDto {
   @Type(() => OccupancyDto)
   rooms!: OccupancyDto[];
 
+  @IsOptional()
   @Matches(/^[A-Z]{3}$/)
-  currency!: string;
+  currency?: string;
 }
 
 export class AvailabilityEnvelopeDto extends EnvelopeDto<AvailabilityDataDto> {

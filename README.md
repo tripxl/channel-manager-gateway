@@ -14,13 +14,17 @@ Stateless NestJS service exposing the private `/internal/v1` API described in th
 
 DJUBO availability and operational APIs are implemented from the supplied **Djubo Direct V9 APIs (2026)** contract. Provider snake_case responses are converted recursively to camelCase at the gateway boundary.
 
-Availability returns a traceable dual response. `normalized` is the provider-neutral contract used across channel adapters, while `rawProviderResponse` is the exact untouched provider body used to diagnose mapping differences. The response also includes provider identity, hotel ID, request ID, and `mappingVersion`. The availability route is not wrapped in the standard success envelope. Consumers must retain the provider's actual party room ID, selected rate, and booking token for booking.
+Availability returns one flattened provider-neutral contract across channel adapters. Provider identity, hotel ID, status, party, rooms, and rate options are stable top-level fields. `trace.rawProviderResponse` retains the exact untouched provider body for diagnosing mapping differences, and `trace.mappingVersion` identifies the mapper contract. The route is not wrapped in the standard success envelope.
 
 DJUBO booking submit accepts the minimal `partnerData` object keyed by the exact availability `room_id`. The same rate token may be repeated for multiple room IDs when those rooms use the same selected rate combination.
+
+For pay-at-checkout bookings, `payments` and `paymentMethod` must both be absent, `finalPriceAtBooking.amount` must be `0`, and `finalPriceAtCheckout.amount` must be positive. When `payments` is supplied, `finalPriceAtBooking.amount` must be positive and equal `payments.amount`. Booking and checkout currencies must be valid matching three-letter uppercase codes.
 
 DJUBO paths and methods are catalogued in `src/providers/djubo/api/djubo-api.constants.ts`. The base URL has a code default and can be overridden with `DJUBO_BASE_URL`; timeout, retry, and concurrency settings remain environment variables because they are deployment-specific.
 
 `DJUBO_AUTH_TOKEN` may contain the raw access token or a `DJUBO-TOKEN`-prefixed value. The legacy `DJUBO_API_TOKEN` key is also accepted. The gateway sends `Authorization: DJUBO-TOKEN <token>`. `DJUBO_QUERY_KEY` and `DJUBO_AVAILABILITY_ID` are optional and also accept the legacy `QUERY_KEY` and `AVAILABILITY_ID` names. Configure them when they are issued by DJUBO. Credentials printed in provider documentation are never copied into the application.
+
+Availability currency defaults from `DJUBO_DEFAULT_CURRENCY`; when it is unset, the adapter falls back to `INR`. Callers may omit `data.currency`.
 
 ## DJUBO operation routes
 

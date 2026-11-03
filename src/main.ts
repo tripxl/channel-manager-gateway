@@ -1,11 +1,11 @@
-import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  app.useLogger(false);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -14,9 +14,15 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: false },
     }),
   );
-  app.getHttpAdapter().getInstance().disable("x-powered-by");
-  app.getHttpAdapter().getInstance().set("trust proxy", 1);
-  await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
+
+  app.setGlobalPrefix("api-gateway/v1", {
+    exclude: ["health", "metrics"],
+  });
+
+  await app.listen(process.env.PORT ?? 8000);
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error("Application failed to start", error);
+  process.exitCode = 1;
+});

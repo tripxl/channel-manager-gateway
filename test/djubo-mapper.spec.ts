@@ -31,6 +31,15 @@ describe("DjuboMapper", () => {
     });
   });
 
+  it("defaults availability currency to INR when omitted", () => {
+    const defaultMapper = new DjuboMapper(new ConfigService({}));
+    expect(defaultMapper.availabilityRequest(context, {
+      checkIn: "2026-12-28",
+      checkOut: "2026-12-29",
+      rooms: [{ adults: 2, childrenAges: [] }],
+    }).currency).toBe("INR");
+  });
+
   it("preserves the canonical room, rate, price and partner token association", () => {
     const result = mapper.availabilityResponse(context, {
       availability_request: {
