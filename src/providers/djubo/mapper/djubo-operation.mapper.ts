@@ -13,27 +13,32 @@ export class DjuboOperationMapper {
   createGuest(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["firstName"]);
     this.requireOne(data, ["phone", "email"]);
+    this.validateGuestContact(data);
+    this.validateGuestAddress(data.address);
     return {
       ...this.base(context),
-      ...data,
-      guestTrackerId: data.guestTrackerId ?? -1,
+      ...this.guestFields(data),
+      guestTrackerId: -1,
     };
   }
 
   updateGuest(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["guestTrackerId", "firstName"]);
     this.requireOne(data, ["phone", "email"]);
-    const { guestTrackerId, guestToBeDeleted, ...rest } = data;
+    this.validateGuestTrackerId(data.guestTrackerId);
+    this.validateGuestContact(data);
+    this.validateGuestAddress(data.address);
     return {
       ...this.base(context),
-      ...rest,
-      guest_tracker_id: guestTrackerId,
-      guest_to_be_deleted: guestToBeDeleted ?? false,
+      ...this.guestFields(data),
+      guest_tracker_id: data.guestTrackerId,
+      guest_to_be_deleted: data.guestToBeDeleted ?? false,
     };
   }
 
   guestHistory(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["guestTrackerId"]);
+    this.validateGuestTrackerId(data.guestTrackerId);
     return {
       api_version: this.apiVersion,
       source_id: this.sourceId,
@@ -230,6 +235,91 @@ export class DjuboOperationMapper {
       sub_source_id: this.subSourceId,
       partner_hotel_code: context.providerHotelId,
     };
+  }
+
+  private guestFields(data: ProviderOperationData) {
+    const fields = [
+      "firstName",
+      "lastName",
+      "phone",
+      "suffix",
+      "email",
+      "card_type",
+      "card_number",
+      "groupLeader",
+      "attachments",
+      "address",
+      "addressLine",
+      "city",
+      "state",
+      "country",
+      "postal_code",
+      "specialInstruction",
+      "contacts",
+      "preferences",
+      "title",
+      "iso2",
+      "isd",
+      "additionalInfo",
+      "internationalDetails",
+    ];
+    return Object.fromEntries(
+      fields
+        .filter((field) => data[field] !== undefined)
+        .map((field) => [field, data[field]]),
+    );
+  }
+
+  private validateGuestTrackerId(value: unknown) {
+    if (
+      (typeof value !== "string" && typeof value !== "number") ||
+      String(value).trim() === "" ||
+      Number(value) < 0
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "guestTrackerId must be a non-negative string or number",
+        HttpStatus.BAD_REQUEST,
+      );
+  }
+
+  private validateGuestContact(data: ProviderOperationData) {
+    if (
+      data.email !== undefined &&
+      (typeof data.email !== "string" ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "email must be a valid email address",
+        HttpStatus.BAD_REQUEST,
+      );
+    if (
+      data.phone !== undefined &&
+      (typeof data.phone !== "string" || !/^\d+$/.test(data.phone))
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "phone must contain digits only and must not include an ISD prefix",
+        HttpStatus.BAD_REQUEST,
+      );
+  }
+
+  private validateGuestAddress(value: unknown) {
+    if (value === undefined) return;
+    this.requireObjectFields(
+      value,
+      ["addressLine", "city", "state", "country", "postalCode"],
+      "address",
+    );
+    const address = value as Record<string, unknown>;
+    this.requireObjectFields(address.city, ["name", "id"], "address.city");
+    this.requireObjectFields(address.state, ["name", "id"], "address.state");
+    this.requireObjectFields(
+      address.country,
+      ["name", "id"],
+      "address.country",
+    );
   }
 
   private get apiVersion() {

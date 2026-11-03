@@ -11,6 +11,43 @@ describe("DjuboOperationMapper", () => {
     });
   });
 
+  it("does not allow guest creation input to override provider-owned fields", () => {
+    expect(mapper.createGuest(context, {
+      firstName: "Yash", phone: "8754530655", guestTrackerId: 123,
+      api_version: 1, source_id: 2, partner_hotel_code: "attacker-controlled",
+    })).toEqual({
+      api_version: 9, source_id: 100, sub_source_id: 1001,
+      partner_hotel_code: "4", firstName: "Yash", phone: "8754530655",
+      guestTrackerId: -1,
+    });
+  });
+
+  it("maps guest update using the documented tracker and deletion field names", () => {
+    expect(mapper.updateGuest(context, {
+      guestTrackerId: 169163, firstName: "Yash", email: "yash@example.com",
+      guestToBeDeleted: false, api_version: 1,
+    })).toEqual({
+      api_version: 9, source_id: 100, sub_source_id: 1001,
+      partner_hotel_code: "4", firstName: "Yash", email: "yash@example.com",
+      guest_tracker_id: 169163, guest_to_be_deleted: false,
+    });
+  });
+
+  it("maps guest history using the selected hotel by default", () => {
+    expect(mapper.guestHistory(context, { guestTrackerId: "169163" })).toEqual({
+      api_version: 9, source_id: 100, sub_source_id: 1001,
+      guest_tracker_id: "169163", partner_hotel_codes: ["4"],
+    });
+  });
+
+  it("validates documented guest contact and nested address requirements", () => {
+    expect(() => mapper.createGuest(context, { firstName: "Yash", email: "invalid" }))
+      .toThrow("email must be a valid email address");
+    expect(() => mapper.createGuest(context, {
+      firstName: "Yash", phone: "8754530655", address: { addressLine: "Noida" },
+    })).toThrow("Missing required address fields: city, state, country, postalCode");
+  });
+
   it("maps booking information as documented query parameters", () => {
     expect(mapper.bookingInformation(context, { referenceId: "ref", reservationId: "res", guestTrackerId: "guest" })).toEqual({
       partner_hotel_code: "4", reference_id: "ref", reservation_id: "res", guest_tracker_id: "guest",

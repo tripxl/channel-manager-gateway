@@ -2,6 +2,7 @@ import { DjuboChannelProvider } from "../src/providers/djubo/djubo-channel.provi
 import { DjuboClient } from "../src/providers/djubo/client/djubo.client";
 import { DjuboMapper } from "../src/providers/djubo/mapper/djubo.mapper";
 import { DjuboOperationMapper } from "../src/providers/djubo/mapper/djubo-operation.mapper";
+import { ConfigService } from "@nestjs/config";
 
 describe("DjuboChannelProvider availability tracing", () => {
   it("returns normalized availability beside the untouched provider response", async () => {
@@ -52,5 +53,96 @@ describe("DjuboChannelProvider availability tracing", () => {
       },
     });
     expect(result.trace.rawProviderResponse).toBe(rawProviderResponse);
+  });
+});
+
+describe("DjuboChannelProvider guest operations", () => {
+  const context = {
+    provider: "DJUBO",
+    providerHotelId: "318",
+    environment: "SANDBOX",
+    requestId: "req-guest",
+  } as const;
+  let request: jest.Mock;
+  let provider: DjuboChannelProvider;
+
+  beforeEach(() => {
+    request = jest.fn();
+    const operationMapper = new DjuboOperationMapper(
+      new ConfigService({
+        DJUBO_API_VERSION: "9",
+        DJUBO_SOURCE_ID: "418",
+        DJUBO_SUB_SOURCE_ID: "221",
+      }),
+    );
+    provider = new DjuboChannelProvider(
+      { request } as unknown as DjuboClient,
+      {} as DjuboMapper,
+      operationMapper,
+    );
+  });
+
+  it("creates a guest through guest-populate and normalizes the response", async () => {
+    request.mockResolvedValue({ guest_tracker_id: 169163 });
+
+    await expect(
+      provider.createGuest(context, {
+        firstName: "Yash",
+        phone: "8754530655",
+      }),
+    ).resolves.toEqual({ guestTrackerId: 169163 });
+    expect(request).toHaveBeenCalledWith(
+      "guestCreate",
+      context,
+      expect.objectContaining({
+        api_version: 9,
+        partner_hotel_code: "318",
+        guestTrackerId: -1,
+        firstName: "Yash",
+      }),
+      false,
+    );
+  });
+
+  it("updates a guest through guest-populate without retrying the write", async () => {
+    request.mockResolvedValue({ guest_tracker_id: 169163, is_updated: true });
+
+    await expect(
+      provider.updateGuest(context, {
+        guestTrackerId: 169163,
+        firstName: "Yash",
+        email: "yash@example.com",
+      }),
+    ).resolves.toEqual({ guestTrackerId: 169163, isUpdated: true });
+    expect(request).toHaveBeenCalledWith(
+      "guestUpdate",
+      context,
+      expect.objectContaining({
+        guest_tracker_id: 169163,
+        guest_to_be_deleted: false,
+      }),
+      false,
+    );
+  });
+
+  it("searches guest history as a retry-safe read and normalizes every item", async () => {
+    request.mockResolvedValue([
+      { guest_tracker_id: "169163", folio_number: "GO-1" },
+    ]);
+
+    await expect(
+      provider.getGuestHistory(context, { guestTrackerId: "169163" }),
+    ).resolves.toEqual([
+      { guestTrackerId: "169163", folioNumber: "GO-1" },
+    ]);
+    expect(request).toHaveBeenCalledWith(
+      "guestHistory",
+      context,
+      expect.objectContaining({
+        guest_tracker_id: "169163",
+        partner_hotel_codes: ["318"],
+      }),
+      true,
+    );
   });
 });
