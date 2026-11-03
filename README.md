@@ -48,6 +48,11 @@ All routes use the same `{ context, data }` envelope as availability.
 
 ## Run
 
+The import-ready Postman collection is available at
+`docs/Channel-Manager.postman_collection.json`. It uses
+collection variables for the gateway URL, hotel, guest, reservation, room, and
+stay values. Requests that mutate provider data are clearly labeled.
+
 ```bash
 cp .env.example .env
 npm install

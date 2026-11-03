@@ -125,6 +125,9 @@ export class DjuboOperationMapper {
 
   bookingInformation(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["referenceId", "reservationId", "guestTrackerId"]);
+    this.requireString(data.referenceId, "referenceId");
+    this.requireString(data.reservationId, "reservationId");
+    this.validateGuestTrackerId(data.guestTrackerId);
     return {
       partner_hotel_code: context.providerHotelId,
       reference_id: data.referenceId,
@@ -138,6 +141,14 @@ export class DjuboOperationMapper {
 
   fetchReservation(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["searchKey", "searchValue"]);
+    this.requireString(data.searchKey, "searchKey");
+    this.requireString(data.searchValue, "searchValue");
+    if (data.date !== undefined && !this.isValidDateOnly(data.date))
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "date must be a valid YYYY-MM-DD date",
+        HttpStatus.BAD_REQUEST,
+      );
     return {
       PartnerHotelCode: context.providerHotelId,
       searchKey: data.searchKey,
@@ -149,6 +160,8 @@ export class DjuboOperationMapper {
 
   roomAvailability(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["startDate", "endDate", "rooms"]);
+    this.validateStay(data.startDate, data.endDate);
+    this.validateOccupancies(data.rooms);
     return {
       api_version: this.apiVersion,
       start_date: data.startDate,
@@ -172,6 +185,16 @@ export class DjuboOperationMapper {
 
   roomStatus(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["roomNumber"]);
+    if (
+      (typeof data.roomNumber !== "string" &&
+        typeof data.roomNumber !== "number") ||
+      String(data.roomNumber).trim() === ""
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "roomNumber must be a non-empty string or number",
+        HttpStatus.BAD_REQUEST,
+      );
     return {
       api_version: this.apiVersion,
       partner_hotel_code: context.providerHotelId,
@@ -202,15 +225,60 @@ export class DjuboOperationMapper {
 
   cancellation(context: ProviderContext, data: ProviderOperationData) {
     this.require(data, ["folioNumber"]);
-    return {
+    this.requireString(data.folioNumber, "folioNumber");
+    if (
+      data.cancellationRule !== undefined &&
+      typeof data.cancellationRule !== "boolean"
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "cancellationRule must be a boolean",
+        HttpStatus.BAD_REQUEST,
+      );
+    const cancellationRule = data.cancellationRule ?? true;
+    if (
+      data.cancellationCharge !== undefined &&
+      (!Number.isFinite(Number(data.cancellationCharge)) ||
+        Number(data.cancellationCharge) < 0)
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "cancellationCharge must be a non-negative number",
+        HttpStatus.BAD_REQUEST,
+      );
+    if (
+      data.isFreeCancellation !== undefined &&
+      typeof data.isFreeCancellation !== "boolean"
+    )
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "isFreeCancellation must be a boolean",
+        HttpStatus.BAD_REQUEST,
+      );
+    if (data.remark !== undefined && typeof data.remark !== "string")
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "remark must be a string",
+        HttpStatus.BAD_REQUEST,
+      );
+    const payload: Record<string, unknown> = {
       api_version: this.apiVersion,
       folio_number: data.folioNumber,
-      cancellation_rule: data.cancellationRule ?? false,
+      cancellation_rule: cancellationRule,
       partner_hotel_code: context.providerHotelId,
-      remark: data.remark,
-      is_free_cancellation: data.isFreeCancellation,
-      cancellation_charge: data.cancellationCharge,
     };
+    this.assignWhenDefined(payload, "remark", data.remark);
+    this.assignWhenDefined(
+      payload,
+      "is_free_cancellation",
+      data.isFreeCancellation,
+    );
+    this.assignWhenDefined(
+      payload,
+      "cancellation_charge",
+      data.cancellationCharge,
+    );
+    return payload;
   }
 
   bookingUpdate(context: ProviderContext, data: ProviderOperationData) {
@@ -322,14 +390,47 @@ export class DjuboOperationMapper {
     );
   }
 
+  private requireString(value: unknown, fieldName: string) {
+    if (typeof value !== "string" || !value.trim())
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        `${fieldName} must be a non-empty string`,
+        HttpStatus.BAD_REQUEST,
+      );
+  }
+
+  private validateOccupancies(value: unknown) {
+    if (!Array.isArray(value) || !value.length)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "rooms must be a non-empty array",
+        HttpStatus.BAD_REQUEST,
+      );
+    const invalid = value.some((rawRoom) => {
+      if (!rawRoom || typeof rawRoom !== "object") return true;
+      const room = rawRoom as Record<string, unknown>;
+      const adults = Number(room.adults);
+      const children = room.childrenAges ?? room.children ?? [];
+      return (
+        !Number.isInteger(adults) || adults < 1 || !Array.isArray(children)
+      );
+    });
+    if (invalid)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        "Every room requires at least one adult and a children array",
+        HttpStatus.BAD_REQUEST,
+      );
+  }
+
   private get apiVersion() {
     return Number(this.config.get("DJUBO_API_VERSION", "9"));
   }
-  
+
   private get sourceId() {
     return Number(this.config.get("DJUBO_SOURCE_ID", 105));
   }
-  
+
   private get subSourceId() {
     return Number(this.config.get("DJUBO_SUB_SOURCE_ID", 110));
   }
@@ -529,12 +630,9 @@ export class DjuboOperationMapper {
   }
 
   private validateStay(startDate: unknown, endDate: unknown) {
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
     if (
-      typeof startDate !== "string" ||
-      typeof endDate !== "string" ||
-      !datePattern.test(startDate) ||
-      !datePattern.test(endDate) ||
+      !this.isValidDateOnly(startDate) ||
+      !this.isValidDateOnly(endDate) ||
       endDate <= startDate
     )
       throw new GatewayException(
@@ -542,6 +640,18 @@ export class DjuboOperationMapper {
         "startDate and endDate must be valid dates and endDate must be after startDate",
         HttpStatus.BAD_REQUEST,
       );
+  }
+
+  private isValidDateOnly(value: unknown): value is string {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+      return false;
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    );
   }
 
   private validateBookingRooms(rooms: unknown) {

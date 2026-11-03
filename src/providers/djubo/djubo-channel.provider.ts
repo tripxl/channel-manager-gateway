@@ -161,6 +161,7 @@ export class DjuboChannelProvider implements ChannelProvider {
       "cancellation",
       context,
       this.operationMapper.cancellation(context, data),
+      data.cancellationRule !== false,
     );
   }
   

@@ -55,6 +55,81 @@ describe("DjuboOperationMapper", () => {
     });
   });
 
+  it("maps fetch reservation using Djubo's documented field casing", () => {
+    expect(mapper.fetchReservation(context, {
+      searchKey: "Folio Reservation Number",
+      searchValue: "GO-100",
+    })).toEqual({
+      PartnerHotelCode: "4",
+      searchKey: "Folio Reservation Number",
+      searchValue: "GO-100",
+      guestDetailedInfo: true,
+    });
+  });
+
+  it("maps room availability and room status requests", () => {
+    expect(mapper.roomAvailability(context, {
+      startDate: "2026-12-10",
+      endDate: "2026-12-12",
+      rooms: [{ adults: 2, childrenAges: [7] }],
+    })).toEqual({
+      api_version: 9,
+      start_date: "2026-12-10",
+      end_date: "2026-12-12",
+      source_id: 100,
+      sub_source_id: 1001,
+      multiple_category_allowed: true,
+      party: [{ adults: 2, children: [7] }],
+      requested_payload: { categories: { hotel_details: true } },
+      hotels: [{ partner_hotel_code: "4" }],
+    });
+    expect(mapper.roomStatus(context, { roomNumber: "6045-GH3" })).toEqual({
+      api_version: 9,
+      partner_hotel_code: "4",
+      room_number: "6045-GH3",
+    });
+  });
+
+  it("defaults cancellation to a safe rule lookup", () => {
+    expect(mapper.cancellation(context, { folioNumber: "GO-100" })).toEqual({
+      api_version: 9,
+      folio_number: "GO-100",
+      cancellation_rule: true,
+      partner_hotel_code: "4",
+    });
+  });
+
+  it("maps an explicit cancellation and validates its charge", () => {
+    expect(mapper.cancellation(context, {
+      folioNumber: "GO-100",
+      cancellationRule: false,
+      remark: "Change of plans",
+      isFreeCancellation: false,
+      cancellationCharge: 300,
+    })).toEqual({
+      api_version: 9,
+      folio_number: "GO-100",
+      cancellation_rule: false,
+      partner_hotel_code: "4",
+      remark: "Change of plans",
+      is_free_cancellation: false,
+      cancellation_charge: 300,
+    });
+    expect(() => mapper.cancellation(context, {
+      folioNumber: "GO-100", cancellationCharge: -1,
+    })).toThrow("cancellationCharge must be a non-negative number");
+  });
+
+  it("rejects invalid room availability input", () => {
+    expect(() => mapper.roomAvailability(context, {
+      startDate: "2026-12-12", endDate: "2026-12-10", rooms: [],
+    })).toThrow("endDate must be after startDate");
+    expect(() => mapper.roomAvailability(context, {
+      startDate: "2026-02-30", endDate: "2026-03-02",
+      rooms: [{ adults: 1, childrenAges: [] }],
+    })).toThrow("startDate and endDate must be valid dates");
+  });
+
   it("maps provider responses recursively to camelCase", () => {
     expect(mapper.response({ voucher_cancelled: true, cancellation_data: { applicable_slab: { day_from_check_in: 1 } } })).toEqual({
       voucherCancelled: true, cancellationData: { applicableSlab: { dayFromCheckIn: 1 } },

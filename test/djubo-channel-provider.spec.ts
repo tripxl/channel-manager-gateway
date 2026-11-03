@@ -146,3 +146,85 @@ describe("DjuboChannelProvider guest operations", () => {
     );
   });
 });
+
+describe("DjuboChannelProvider reservation operations", () => {
+  const context = {
+    provider: "DJUBO",
+    providerHotelId: "318",
+    environment: "SANDBOX",
+    requestId: "req-reservation",
+  } as const;
+  let request: jest.Mock;
+  let provider: DjuboChannelProvider;
+
+  beforeEach(() => {
+    request = jest.fn().mockResolvedValue({ voucher_updated: true });
+    provider = new DjuboChannelProvider(
+      { request } as unknown as DjuboClient,
+      {} as DjuboMapper,
+      new DjuboOperationMapper(new ConfigService({
+        DJUBO_API_VERSION: "9",
+        DJUBO_SOURCE_ID: "418",
+        DJUBO_SUB_SOURCE_ID: "221",
+      })),
+    );
+  });
+
+  it.each([
+    [
+      "bookingInformation",
+      () => provider.getBookingInformation(context, {
+        referenceId: "AIRIQ-1", reservationId: "GO-1", guestTrackerId: "169163",
+      }),
+      "bookingInformation",
+      expect.objectContaining({ reference_id: "AIRIQ-1", reservation_id: "GO-1" }),
+    ],
+    [
+      "reservation",
+      () => provider.fetchReservation(context, {
+        searchKey: "Folio Reservation Number", searchValue: "GO-1",
+      }),
+      "reservation",
+      expect.objectContaining({ PartnerHotelCode: "318", searchValue: "GO-1" }),
+    ],
+    [
+      "roomAvailability",
+      () => provider.fetchRoomNumbers(context, {
+        startDate: "2026-12-10", endDate: "2026-12-11",
+        rooms: [{ adults: 2, childrenAges: [] }],
+      }),
+      "roomAvailability",
+      expect.objectContaining({ hotels: [{ partner_hotel_code: "318" }] }),
+    ],
+    [
+      "roomStatus",
+      () => provider.fetchRoomStatus(context, { roomNumber: "304-A" }),
+      "roomStatus",
+      expect.objectContaining({ room_number: "304-A" }),
+    ],
+  ])("executes %s as a retry-safe read", async (_name, invoke, operation, payload) => {
+    await invoke();
+    expect(request).toHaveBeenCalledWith(operation, context, payload, true);
+  });
+
+  it("treats a cancellation-rule lookup as retry-safe", async () => {
+    request.mockResolvedValue({ cancellation_data: { applicable_slab: { penalty: 20 } } });
+    await expect(provider.cancelReservation(context, { folioNumber: "GO-1" }))
+      .resolves.toEqual({ cancellationData: { applicableSlab: { penalty: 20 } } });
+    expect(request).toHaveBeenCalledWith(
+      "cancellation", context,
+      expect.objectContaining({ cancellation_rule: true }), true,
+    );
+  });
+
+  it("never retries an explicit cancellation write", async () => {
+    request.mockResolvedValue({ voucher_cancelled: true });
+    await expect(provider.cancelReservation(context, {
+      folioNumber: "GO-1", cancellationRule: false,
+    })).resolves.toEqual({ voucherCancelled: true });
+    expect(request).toHaveBeenCalledWith(
+      "cancellation", context,
+      expect.objectContaining({ cancellation_rule: false }), false,
+    );
+  });
+});

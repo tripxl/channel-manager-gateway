@@ -1,0 +1,190 @@
+{
+  "info": {
+    "_postman_id": "f5772f2c-1f65-4e08-b783-djubo-v9-gateway",
+    "name": "DJUBO V9 Channel Manager Gateway",
+    "description": "Executable examples for the implemented DJUBO V9 gateway APIs. Update the collection variables before use. Requests marked destructive can create, update, check in/out, or cancel provider data.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.variables.set('requestId', pm.variables.replaceIn('{{$guid}}'));"
+        ]
+      }
+    }
+  ],
+  "auth": { "type": "noauth" },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api-gateway/v1", "type": "string" },
+    { "key": "provider", "value": "DJUBO", "type": "string" },
+    { "key": "providerHotelId", "value": "318", "type": "string" },
+    { "key": "environment", "value": "SANDBOX", "type": "string" },
+    { "key": "guestTrackerId", "value": "169163", "type": "string" },
+    { "key": "folioNumber", "value": "GO-0005743", "type": "string" },
+    { "key": "reservationId", "value": "GO-0005743", "type": "string" },
+    { "key": "referenceId", "value": "AIRIQ-BOOKING-001", "type": "string" },
+    { "key": "checkIn", "value": "2026-12-10", "type": "string" },
+    { "key": "checkOut", "value": "2026-12-12", "type": "string" },
+    { "key": "roomNumber", "value": "304", "type": "string" },
+    { "key": "bookingToken", "value": "replace-with-availability-partner-data", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        { "name": "Liveness", "request": { "method": "GET", "url": "{{baseUrl}}/internal/health/live" } },
+        { "name": "Readiness", "request": { "method": "GET", "url": "{{baseUrl}}/internal/health/ready" } },
+        { "name": "Provider Capabilities", "request": { "method": "GET", "url": "{{baseUrl}}/internal/providers/capabilities" } }
+      ]
+    },
+    {
+      "name": "Availability and Rooms",
+      "item": [
+        {
+          "name": "Hotel Availability",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"checkIn\": \"{{checkIn}}\",\n    \"checkOut\": \"{{checkOut}}\",\n    \"rooms\": [{ \"adults\": 2, \"childrenAges\": [] }],\n    \"currency\": \"INR\"\n  }\n}" },
+            "url": "{{baseUrl}}/internal/availability"
+          }
+        },
+        {
+          "name": "Room Availability",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"startDate\": \"{{checkIn}}\",\n    \"endDate\": \"{{checkOut}}\",\n    \"rooms\": [{ \"adults\": 2, \"childrenAges\": [] }]\n  }\n}" },
+            "url": "{{baseUrl}}/internal/rooms/availability"
+          }
+        },
+        {
+          "name": "Room Status",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": { \"roomNumber\": \"{{roomNumber}}\" }\n}" },
+            "url": "{{baseUrl}}/internal/rooms/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Guests",
+      "item": [
+        {
+          "name": "Create Guest [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "description": "Creates a guest or returns an existing matching guest. DJUBO receives guestTrackerId=-1.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"firstName\": \"Yash\",\n    \"lastName\": \"Mangal\",\n    \"phone\": \"8754530655\",\n    \"email\": \"yash.mangal@example.com\",\n    \"title\": 1,\n    \"iso2\": \"IN\",\n    \"isd\": \"91\"\n  }\n}" },
+            "url": "{{baseUrl}}/internal/guests"
+          }
+        },
+        {
+          "name": "Update Guest [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "description": "Updates the selected guest. Keep guestToBeDeleted=false unless permanent deletion is intended.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"guestTrackerId\": \"{{guestTrackerId}}\",\n    \"firstName\": \"Yash\",\n    \"lastName\": \"Mangal\",\n    \"phone\": \"8754530655\",\n    \"email\": \"updated.yash@example.com\",\n    \"guestToBeDeleted\": false\n  }\n}" },
+            "url": "{{baseUrl}}/internal/guests/update"
+          }
+        },
+        {
+          "name": "Guest History",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": { \"guestTrackerId\": \"{{guestTrackerId}}\" }\n}" },
+            "url": "{{baseUrl}}/internal/guests/history"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings and Reservations",
+      "item": [
+        {
+          "name": "Submit Booking [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "description": "Replace bookingToken with partner_data returned by availability for room_id 101. This example is pay-at-checkout.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"startDate\": \"{{checkIn}}\",\n    \"endDate\": \"{{checkOut}}\",\n    \"referenceId\": \"{{referenceId}}\",\n    \"customer\": {\n      \"firstName\": \"Yash\",\n      \"lastName\": \"Mangal\",\n      \"phoneNumber\": \"8754530655\",\n      \"email\": \"yash.mangal@example.com\",\n      \"country\": \"IN\"\n    },\n    \"rooms\": [{\n      \"party\": [{ \"adults\": 2, \"childrenAges\": [] }],\n      \"travelerFirstName\": \"Yash\",\n      \"travelerLastName\": \"Mangal\"\n    }],\n    \"finalPriceAtBooking\": { \"amount\": 0, \"currency\": \"INR\" },\n    \"finalPriceAtCheckout\": { \"amount\": 10235, \"currency\": \"INR\" },\n    \"partnerData\": { \"101\": \"{{bookingToken}}\" }\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/submit"
+          }
+        },
+        {
+          "name": "Booking Information",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"referenceId\": \"{{referenceId}}\",\n    \"reservationId\": \"{{reservationId}}\",\n    \"guestTrackerId\": \"{{guestTrackerId}}\"\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/information"
+          }
+        },
+        {
+          "name": "Fetch Reservation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"searchKey\": \"Folio Reservation Number\",\n    \"searchValue\": \"{{folioNumber}}\",\n    \"guestDetailedInfo\": true\n  }\n}" },
+            "url": "{{baseUrl}}/internal/reservations/fetch"
+          }
+        },
+        {
+          "name": "Cancellation Rule Lookup",
+          "request": {
+            "method": "POST",
+            "description": "Safe lookup only; cancellationRule=true does not cancel the reservation.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"folioNumber\": \"{{folioNumber}}\",\n    \"cancellationRule\": true\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/cancellation"
+          }
+        },
+        {
+          "name": "Execute Cancellation [Destructive]",
+          "request": {
+            "method": "POST",
+            "description": "WARNING: cancellationRule=false performs the actual cancellation.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"folioNumber\": \"{{folioNumber}}\",\n    \"cancellationRule\": false,\n    \"remark\": \"Guest requested cancellation\",\n    \"isFreeCancellation\": false,\n    \"cancellationCharge\": 300\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/cancellation"
+          }
+        },
+        {
+          "name": "Check In [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"folioNumber\": \"{{folioNumber}}\",\n    \"housekeepingSoftCheck\": false\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/check-in"
+          }
+        },
+        {
+          "name": "Check Out [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": { \"folioNumber\": \"{{folioNumber}}\" }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/check-out"
+          }
+        },
+        {
+          "name": "Update Booking Room [Writes Provider Data]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-request-id", "value": "{{requestId}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"context\": {\n    \"provider\": \"{{provider}}\",\n    \"providerHotelId\": \"{{providerHotelId}}\",\n    \"environment\": \"{{environment}}\",\n    \"requestId\": \"{{requestId}}\"\n  },\n  \"data\": {\n    \"folioNumber\": \"{{folioNumber}}\",\n    \"folioInternalNotes\": \"Moved per guest request\",\n    \"rooms\": [{\n      \"oldRoomNo\": \"304\",\n      \"newRoomNo\": \"305\",\n      \"oldCategoryId\": 2693,\n      \"newCategoryId\": 2693\n    }]\n  }\n}" },
+            "url": "{{baseUrl}}/internal/bookings/update"
+          }
+        }
+      ]
+    }
+  ]
+}
