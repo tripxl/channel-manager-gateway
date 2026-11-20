@@ -45,6 +45,9 @@ All routes use the same `{ context, data }` envelope as availability.
 | `POST /internal/bookings/check-out` | Check-out |
 | `POST /internal/bookings/cancellation` | Cancellation/rules |
 | `POST /internal/bookings/update` | Booking room/category update |
+| `POST /internal/reference-country` | Country reference list |
+| `POST /internal/reference-state` | State reference list by `countryId` |
+| `POST /internal/reference-city` | City reference list by `stateId` |
 
 ## Run
 

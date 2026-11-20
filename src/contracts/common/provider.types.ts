@@ -38,4 +38,7 @@ export interface ProviderCapabilities {
   checkIn: boolean;
   checkOut: boolean;
   bookingUpdate: boolean;
+  referenceCountry: boolean;
+  referenceState: boolean;
+  referenceCity: boolean;
 }

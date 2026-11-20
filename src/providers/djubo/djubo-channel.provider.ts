@@ -35,13 +35,16 @@ export class DjuboChannelProvider implements ChannelProvider {
     checkIn: true,
     checkOut: true,
     bookingUpdate: true,
+    referenceCountry: true,
+    referenceState: true,
+    referenceCity: true,
   };
   constructor(
     private readonly client: DjuboClient,
     private readonly mapper: DjuboMapper,
     private readonly operationMapper: DjuboOperationMapper,
   ) {}
-  
+
   async getAvailability(
     context: ProviderContext,
     request: AvailabilityRequest,
@@ -155,7 +158,7 @@ export class DjuboChannelProvider implements ChannelProvider {
       this.operationMapper.checkOut(context, data),
     );
   }
-  
+
   cancelReservation(context: ProviderContext, data: ProviderOperationData) {
     return this.execute(
       "cancellation",
@@ -164,12 +167,39 @@ export class DjuboChannelProvider implements ChannelProvider {
       data.cancellationRule !== false,
     );
   }
-  
+
   updateBooking(context: ProviderContext, data: ProviderOperationData) {
     return this.execute(
       "bookingUpdate",
       context,
       this.operationMapper.bookingUpdate(context, data),
+    );
+  }
+
+  getReferenceCountries(context: ProviderContext, data: ProviderOperationData) {
+    return this.execute(
+      "referenceCountry",
+      context,
+      this.operationMapper.referenceCountry(data),
+      true,
+    );
+  }
+
+  getReferenceStates(context: ProviderContext, data: ProviderOperationData) {
+    return this.execute(
+      "referenceState",
+      context,
+      this.operationMapper.referenceState(data),
+      true,
+    );
+  }
+
+  getReferenceCities(context: ProviderContext, data: ProviderOperationData) {
+    return this.execute(
+      "referenceCity",
+      context,
+      this.operationMapper.referenceCity(data),
+      true,
     );
   }
 

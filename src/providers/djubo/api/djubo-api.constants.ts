@@ -23,4 +23,19 @@ export const DJUBO_ENDPOINTS = {
   checkOut: { method: "POST", path: "/update-booking-stage", enabled: true },
   cancellation: { method: "POST", path: "/cancel-reservation", enabled: true },
   bookingUpdate: { method: "POST", path: "/update-reservation", enabled: true },
+  referenceCountry: {
+    method: "POST",
+    path: "/reference-country",
+    enabled: true,
+  },
+  referenceState: {
+    method: "POST",
+    path: "/reference-state",
+    enabled: true,
+  },
+  referenceCity: {
+    method: "POST",
+    path: "/reference-city",
+    enabled: true,
+  },
 } as const;

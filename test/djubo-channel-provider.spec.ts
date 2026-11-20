@@ -227,4 +227,21 @@ describe("DjuboChannelProvider reservation operations", () => {
       expect.objectContaining({ cancellation_rule: false }), false,
     );
   });
+
+  it.each([
+    ["referenceCountry", () => provider.getReferenceCountries(context, {}), {}],
+    [
+      "referenceState",
+      () => provider.getReferenceStates(context, { countryId: 255 }),
+      { country_id: 255 },
+    ],
+    [
+      "referenceCity",
+      () => provider.getReferenceCities(context, { stateId: 53 }),
+      { state_id: 53 },
+    ],
+  ])("executes %s reference lookup as a retry-safe read", async (operation, invoke, payload) => {
+    await invoke();
+    expect(request).toHaveBeenCalledWith(operation, context, payload, true);
+  });
 });

@@ -107,4 +107,16 @@ export interface ChannelProvider {
     context: ProviderContext,
     request: ProviderOperationData,
   ): Promise<ProviderOperationResponse>;
+  getReferenceCountries?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  getReferenceStates?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
+  getReferenceCities?(
+    context: ProviderContext,
+    request: ProviderOperationData,
+  ): Promise<ProviderOperationResponse>;
 }

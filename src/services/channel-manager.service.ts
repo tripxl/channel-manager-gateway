@@ -149,6 +149,27 @@ export class ChannelManagerService {
     return provider.updateBooking(request.context, request.data);
   }
 
+  getReferenceCountries(request: ProviderOperationEnvelopeDto) {
+    const provider = this.providerFactory.get(request.context.provider);
+    if (!provider.getReferenceCountries)
+      throw unsupportedOperation(provider.code, "reference countries");
+    return provider.getReferenceCountries(request.context, request.data);
+  }
+
+  getReferenceStates(request: ProviderOperationEnvelopeDto) {
+    const provider = this.providerFactory.get(request.context.provider);
+    if (!provider.getReferenceStates)
+      throw unsupportedOperation(provider.code, "reference states");
+    return provider.getReferenceStates(request.context, request.data);
+  }
+
+  getReferenceCities(request: ProviderOperationEnvelopeDto) {
+    const provider = this.providerFactory.get(request.context.provider);
+    if (!provider.getReferenceCities)
+      throw unsupportedOperation(provider.code, "reference cities");
+    return provider.getReferenceCities(request.context, request.data);
+  }
+
   private validateStay(checkIn: string, checkOut: string) {
     if (checkOut <= checkIn)
       throw new GatewayException(

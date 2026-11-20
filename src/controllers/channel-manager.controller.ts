@@ -27,25 +27,25 @@ export class ChannelManagerController {
     return this.channelManagerService.recheckRate(request);
   }
 
-  @Post("bookings")
-  createBooking(@Body() request: CreateBookingEnvelopeDto) {
-    return this.channelManagerService.createBooking(request);
-  }
+  // @Post("bookings")
+  // createBooking(@Body() request: CreateBookingEnvelopeDto) {
+  //   return this.channelManagerService.createBooking(request);
+  // }
 
-  @Post("bookings/verify")
-  verifyBooking(@Body() request: BookingIdentifiersEnvelopeDto) {
-    return this.channelManagerService.verifyBooking(request);
-  }
+  // @Post("bookings/verify")
+  // verifyBooking(@Body() request: BookingIdentifiersEnvelopeDto) {
+  //   return this.channelManagerService.verifyBooking(request);
+  // }
 
-  @Post("bookings/details")
-  getBookingDetails(@Body() request: BookingIdentifiersEnvelopeDto) {
-    return this.channelManagerService.getBookingDetails(request);
-  }
+  // @Post("bookings/details")
+  // getBookingDetails(@Body() request: BookingIdentifiersEnvelopeDto) {
+  //   return this.channelManagerService.getBookingDetails(request);
+  // }
 
-  @Post("bookings/cancel")
-  cancelBooking(@Body() request: CancelEnvelopeDto) {
-    return this.channelManagerService.cancelBooking(request);
-  }
+  // @Post("bookings/cancel")
+  // cancelBooking(@Body() request: CancelEnvelopeDto) {
+  //   return this.channelManagerService.cancelBooking(request);
+  // }
 
   @Get("providers/capabilities")
   capabilities() {
@@ -113,13 +113,18 @@ export class ChannelManagerController {
     return this.channelManagerService.updateBooking(request);
   }
 
-  @Get("health/live")
-  live() {
-    return { status: "ok" };
+  @Post("reference-country")
+  getReferenceCountries(@Body() request: ProviderOperationEnvelopeDto) {
+    return this.channelManagerService.getReferenceCountries(request);
   }
 
-  @Get("health/ready")
-  ready() {
-    return { status: "ready" };
+  @Post("reference-state")
+  getReferenceStates(@Body() request: ProviderOperationEnvelopeDto) {
+    return this.channelManagerService.getReferenceStates(request);
+  }
+
+  @Post("reference-city")
+  getReferenceCities(@Body() request: ProviderOperationEnvelopeDto) {
+    return this.channelManagerService.getReferenceCities(request);
   }
 }

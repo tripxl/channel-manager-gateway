@@ -292,6 +292,22 @@ export class DjuboOperationMapper {
     };
   }
 
+  referenceCountry(_data: ProviderOperationData) {
+    return {};
+  }
+
+  referenceState(data: ProviderOperationData) {
+    this.require(data, ["countryId"]);
+    this.requirePositiveInteger(data.countryId, "countryId");
+    return { country_id: data.countryId };
+  }
+
+  referenceCity(data: ProviderOperationData) {
+    this.require(data, ["stateId"]);
+    this.requirePositiveInteger(data.stateId, "stateId");
+    return { state_id: data.stateId };
+  }
+
   response(value: unknown): ProviderOperationResponse {
     return this.camelCaseDeep(value) as ProviderOperationResponse;
   }
@@ -395,6 +411,15 @@ export class DjuboOperationMapper {
       throw new GatewayException(
         "VALIDATION_FAILED",
         `${fieldName} must be a non-empty string`,
+        HttpStatus.BAD_REQUEST,
+      );
+  }
+
+  private requirePositiveInteger(value: unknown, fieldName: string) {
+    if (!Number.isInteger(value) || Number(value) <= 0)
+      throw new GatewayException(
+        "VALIDATION_FAILED",
+        `${fieldName} must be a positive integer`,
         HttpStatus.BAD_REQUEST,
       );
   }

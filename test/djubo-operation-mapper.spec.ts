@@ -136,6 +136,26 @@ describe("DjuboOperationMapper", () => {
     });
   });
 
+  it("maps the reference lookup request bodies from the V9 specification", () => {
+    expect(mapper.referenceCountry({})).toEqual({});
+    expect(mapper.referenceState({ countryId: 255 })).toEqual({
+      country_id: 255,
+    });
+    expect(mapper.referenceCity({ stateId: 53 })).toEqual({ state_id: 53 });
+  });
+
+  it("validates reference lookup identifiers", () => {
+    expect(() => mapper.referenceState({})).toThrow(
+      "Missing required fields: countryId",
+    );
+    expect(() => mapper.referenceState({ countryId: "255" })).toThrow(
+      "countryId must be a positive integer",
+    );
+    expect(() => mapper.referenceCity({ stateId: 0 })).toThrow(
+      "stateId must be a positive integer",
+    );
+  });
+
   it("rejects missing mandatory operation fields", () => {
     expect(() => mapper.fetchReservation(context, { searchKey: "Folio Reservation Number" })).toThrow("Missing required fields: searchValue");
   });
